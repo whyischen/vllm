@@ -292,6 +292,7 @@ class AsyncLLM(EngineClient):
         # Create a new output collector for the request.
         queue = RequestOutputCollector(output_kind=params.output_kind)
 
+        # 根据参数初始化 request
         # Convert Input --> Request.
         if isinstance(prompt, EngineCoreRequest):
             request = prompt
@@ -316,13 +317,15 @@ class AsyncLLM(EngineClient):
         # Use cloned params that may have been updated in process_inputs()
         params = request.params
 
+        # 只需要处理1个结果
         if is_pooling or params.n == 1:
             await self._add_request(request, prompt_text, None, 0, queue)
             return queue
 
         parent_params = params
         assert isinstance(parent_params, SamplingParams)
-
+        
+        # open-ai 的 api 中，允许添加参数 n，即同一条 prompt ，生成 n 个结果
         # Fan out child requests (for n>1).
         parent_request = ParentRequest(request_id, parent_params)
         for idx in range(parent_params.n):
