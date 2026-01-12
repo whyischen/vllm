@@ -162,6 +162,8 @@ class OpenAIServingChat(OpenAIServing):
         self.supports_code_interpreter = False
         self.python_tool = None
 
+    # ChatCompletion API
+    # 创建对话  
     async def create_chat_completion(
         self,
         request: ChatCompletionRequest,
@@ -226,7 +228,8 @@ class OpenAIServingChat(OpenAIServing):
                 tool_dicts = [tool.model_dump() for tool in request.tools]
 
             if not self.use_harmony:
-                # Common case.
+                # Common case. 普通模型
+                # 参数检查
                 error_check_ret = self._validate_chat_template(
                     request_chat_template=request.chat_template,
                     chat_template_kwargs=request.chat_template_kwargs,
@@ -234,6 +237,18 @@ class OpenAIServingChat(OpenAIServing):
                 )
                 if error_check_ret is not None:
                     return error_check_ret
+
+                # 预处理对话
+                # conversation：处理后的对话对象
+                # engine_prompts：引擎可用的提示词
+                '''
+                处理流程
+                1. 验证聊天模板 - 确保模板有效
+                2. 应用模板 - 将消息转换为模型格式
+                3. 处理工具 - 整合工具调用信息
+                4. 添加特殊token - 处理BOS/EOS等
+                5. 生成提示词 - 创建最终输入
+                '''
                 conversation, engine_prompts = await self._preprocess_chat(
                     request,
                     tokenizer,
@@ -249,8 +264,9 @@ class OpenAIServingChat(OpenAIServing):
                     add_special_tokens=request.add_special_tokens,
                 )
             else:
-                # For GPT-OSS.
+                # GPT-OSS 模型
                 conversation, engine_prompts = self._make_request_with_harmony(request)
+        
         except (ValueError, TypeError, RuntimeError, jinja2.TemplateError) as e:
             logger.exception("Error in preprocessing prompt inputs")
             return self.create_error_response(f"{e} {e.__cause__}")
@@ -263,6 +279,7 @@ class OpenAIServingChat(OpenAIServing):
         if raw_request:
             raw_request.state.request_metadata = request_metadata
 
+        # 数据并行
         # Extract data_parallel_rank from header (router can inject it)
         data_parallel_rank = self._get_data_parallel_rank(raw_request)
 
