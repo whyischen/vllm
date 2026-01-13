@@ -283,11 +283,15 @@ class OpenAIServingChat(OpenAIServing):
         # Extract data_parallel_rank from header (router can inject it)
         data_parallel_rank = self._get_data_parallel_rank(raw_request)
 
+        # 结果生成器，虽然声明的是 [], 但是会验证 len = 1，说明这个方法一次只会处理一次对话
         # Schedule the request and get the result generator.
         generators: list[AsyncGenerator[RequestOutput, None]] = []
         try:
+            # engine_prompts 多数情况只会有一个，循环长度为 1
             for i, engine_prompt in enumerate(engine_prompts):
                 prompt_text, _, _ = self._get_prompt_components(engine_prompt)
+                # 如果有多个 prompt，为子请求生成 request_id
+                # 只有一个 prompt，request_id 不变
                 # If we are creating sub requests for multiple prompts, ensure that they
                 # have unique request ids.
                 sub_request_id = (
@@ -297,6 +301,7 @@ class OpenAIServingChat(OpenAIServing):
                 if self.default_sampling_params is None:
                     self.default_sampling_params = {}
 
+                # 根据输入计算本轮对话的最大生成 token 数量并返回
                 max_tokens = get_max_tokens(
                     max_model_len=self.max_model_len,
                     request=request,
@@ -304,6 +309,7 @@ class OpenAIServingChat(OpenAIServing):
                     default_sampling_params=self.default_sampling_params,
                 )
 
+                # 采样参数
                 sampling_params: SamplingParams | BeamSearchParams
                 if request.use_beam_search:
                     sampling_params = request.to_beam_search_params(
@@ -351,16 +357,20 @@ class OpenAIServingChat(OpenAIServing):
                         priority=request.priority,
                     )
 
+                    # 这边 engine_client 是协议类
+                    # 具体的实现由 AsyncLLMEngine 提供
+                    # 返回的 generator 是 AsyncGenerator[RequestOutput, None] 类型
+                    # 这个生成器会持续从队列中获取推理结果并yield出来
                     generator = self.engine_client.generate(
-                        engine_request,
-                        sampling_params,
-                        sub_request_id,
-                        lora_request=lora_request,
-                        trace_headers=trace_headers,
-                        priority=request.priority,
-                        prompt_text=prompt_text,
-                        tokenization_kwargs=tokenization_kwargs,
-                        data_parallel_rank=data_parallel_rank,
+                        engine_request,                    # 处理后的请求对象
+                        sampling_params,                   # 采样参数（如 temperature、top_p）
+                        sub_request_id,                    # 唯一请求 ID
+                        lora_request=lora_request,         # LoRA 适配器配置（可选）
+                        trace_headers=trace_headers,       # 分布式追踪头信息
+                        priority=request.priority,         # 请求优先级
+                        prompt_text=prompt_text,           # 原始文本提示
+                        tokenization_kwargs=tokenization_kwargs,  # 分词相关元数据
+                        data_parallel_rank=data_parallel_rank,    # 数据并行 rank（用于多实例）
                     )
 
                 generators.append(generator)

@@ -474,6 +474,7 @@ async def create_messages(request: AnthropicMessagesRequest, raw_request: Reques
     return StreamingResponse(content=generator, media_type="text/event-stream")
 
 
+# open-ai api 请求入口
 @router.post(
     "/v1/chat/completions",
     dependencies=[Depends(validate_json_request)],
@@ -491,11 +492,13 @@ async def create_chat_completion(request: ChatCompletionRequest, raw_request: Re
         ENDPOINT_LOAD_METRICS_FORMAT_HEADER_LABEL, ""
     )
     handler = chat(raw_request)
+    # 错误校验
     if handler is None:
         return base(raw_request).create_error_response(
             message="The model does not support Chat Completions API"
         )
     try:
+        # 创建对话请求
         generator = await handler.create_chat_completion(request, raw_request)
     except Exception as e:
         raise HTTPException(
