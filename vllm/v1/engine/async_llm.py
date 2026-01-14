@@ -387,7 +387,7 @@ class AsyncLLM(EngineClient):
         The caller of generate() iterates the returned AsyncGenerator,
         returning the RequestOutput back to the caller.
         """
-
+        # 参数检查
         if (
             self.vllm_config.cache_config.kv_sharing_fast_prefill
             and sampling_params.prompt_logprobs
@@ -399,6 +399,10 @@ class AsyncLLM(EngineClient):
             )
 
         try:
+            # 首次调用 generate() 时，启动 output_handler
+            # _run_output_handler 是 AsyncLLM 类中的一个私有实例方法，
+            # 负责创建并运行一个持续的后台 asyncio 任务（output_handler），
+            # 该任务从 EngineCore 拉取模型输出，经过处理后推送到每个请求对应的输出流中。
             # We start the output_handler on the first call to generate() so
             # we can call __init__ before the event loop, which enables us
             # to handle startup failure gracefully in the OpenAI server.
@@ -408,6 +412,10 @@ class AsyncLLM(EngineClient):
             async with self._pause_cond:
                 await self._pause_cond.wait_for(lambda: not self._paused)
 
+            # tokenization_kwargs 是一个可选字典参数，用于向 tokenizer 传递自定义配置。
+            # kwargs 是 Python 里一个非常常见的缩写，意思是：key-word arguments（关键字参数）
+            # 注意：tokenization_kwargs 是透传参数，不被 vLLM 自身解析，而是直接交给底层 tokenizer（如 transformers 库）处理，
+            # 因此其行为完全依赖于所使用的 tokenizer 实现。
             if tokenization_kwargs is None:
                 tokenization_kwargs = {}
                 truncate_prompt_tokens = sampling_params.truncate_prompt_tokens
