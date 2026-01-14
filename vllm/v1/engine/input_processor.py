@@ -388,7 +388,8 @@ class InputProcessor:
             )
             mm_uuids[modality] = [f"{request_id}-{modality}-{i}" for i in range(n)]
         return mm_uuids
-
+    
+    # 输入处理入口
     def process_inputs(
         self,
         request_id: str,
@@ -401,9 +402,11 @@ class InputProcessor:
         priority: int = 0,
         data_parallel_rank: int | None = None,
     ) -> EngineCoreRequest:
+        # 验证 LoRA 请求和采样参数
         self._validate_lora(lora_request)
         self._validate_params(params)
 
+        # dp rank 参数检查
         data_parallel_size = self.vllm_config.parallel_config.data_parallel_size
         if data_parallel_rank is not None and not (
             0 <= data_parallel_rank < data_parallel_size
@@ -490,6 +493,7 @@ class InputProcessor:
         else:
             pooling_params = params.clone()
 
+        # 多模态相关
         # Multimodal related.
         mm_features: list[MultiModalFeatureSpec] | None = None
 
@@ -513,7 +517,7 @@ class InputProcessor:
                         mm_position=decoder_mm_positions[modality][idx],
                     )
                 )
-
+        # 构建 EngineCoreRequest 对象，用于发送到 EngineCore
         return EngineCoreRequest(
             request_id=request_id,
             prompt_token_ids=prompt_token_ids,

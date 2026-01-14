@@ -483,6 +483,8 @@ class AsyncLLM(EngineClient):
                 logger.info("Request %s failed.", request_id)
             raise EngineGenerateError() from e
 
+
+    # 输出处理入口
     def _run_output_handler(self):
         """Background loop: pulls from EngineCore and pushes to AsyncStreams."""
 
@@ -497,6 +499,7 @@ class AsyncLLM(EngineClient):
         logger_manager = self.logger_manager
         input_processor = self.input_processor
 
+        # 循环处理模型输出
         async def output_handler():
             try:
                 while True:
