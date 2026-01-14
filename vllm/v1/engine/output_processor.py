@@ -32,6 +32,8 @@ from vllm.v1.metrics.stats import (
 
 class RequestOutputCollector:
     """
+    收集每个独立请求的流式 RequestOutput，
+    并传递给消费端的 asyncio generate 任务。
     Collects streamed RequestOutputs per individual request,
     for hand-off to the consuming asyncio generate task.
 

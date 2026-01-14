@@ -346,9 +346,12 @@ class AsyncLLM(EngineClient):
         index: int,
         queue: RequestOutputCollector,
     ):
+        # 将新的 EngineCoreRequest 添加到 OutputProcessor 的内部状态中以跟踪并管理请求。
+        # self.request_states[request_id] = req_state
         # Add the request to OutputProcessor (this process).
         self.output_processor.add_request(request, prompt, parent_req, index, queue)
 
+        # 通过 ZMQ 将请求发送到后台EngineCore进程
         # Add the EngineCoreRequest to EngineCore (separate process).
         await self.engine_core.add_request_async(request)
 
