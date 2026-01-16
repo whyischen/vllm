@@ -634,6 +634,8 @@ class EngineCoreProc(EngineCore):
 
             self._init_data_parallel(vllm_config)
 
+            # super 就是 EngineCore
+            # EngineCore 中初始化了 scheduler
             super().__init__(
                 vllm_config, executor_class, log_stats, executor_fail_callback
             )
