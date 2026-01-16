@@ -103,6 +103,8 @@ class EngineCoreClient(ABC):
         client_count: int = 1,
         client_index: int = 0,
     ) -> "MPClient":
+        # MP = Multi-Process（多进程）
+
         parallel_config = vllm_config.parallel_config
         client_args = (
             vllm_config,
@@ -112,12 +114,18 @@ class EngineCoreClient(ABC):
             client_count,
             client_index,
         )
+        # 根据 data_parallel_size 决定使用哪种客户端
         if parallel_config.data_parallel_size > 1:
             if parallel_config.data_parallel_external_lb:
+                # 外部负载均衡，依赖外部负载均衡器（如 Kubernetes Service）分发请求
+                # 每个数据并行 rank 有独立的客户端
                 # External load balancer - client per DP rank.
                 return DPAsyncMPClient(*client_args)
+            
+            # 内部负载均衡，客户端内部实现负载均衡逻辑
             # Internal load balancer - client balances to all DP ranks.
             return DPLBAsyncMPClient(*client_args)
+        # 默认单实例客户端，直接与单个 EngineCore 进程通信
         return AsyncMPClient(*client_args)
 
     @abstractmethod
@@ -904,6 +912,7 @@ class AsyncMPClient(MPClient):
         if engine is None:
             engine = self.core_engine
 
+        # 构造消息：(请求类型, 序列化后的请求数据)
         message = (request_type.value, *self.encoder.encode(request))
         return self._send_input_message(message, engine, request)
 
@@ -953,8 +962,10 @@ class AsyncMPClient(MPClient):
         return await self.call_utility_async("get_supported_tasks")
 
     async def add_request_async(self, request: EngineCoreRequest) -> None:
+        # 标记该请求来自哪个客户端实例。
         request.client_index = self.client_index
         await self._send_input(EngineCoreRequestType.ADD, request)
+        # 确保输出处理任务（output_queue_task）正在运行，以便接收后续生成结果。
         self._ensure_output_queue_task()
 
     async def abort_requests_async(self, request_ids: list[str]) -> None:
