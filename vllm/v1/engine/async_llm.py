@@ -283,12 +283,22 @@ class AsyncLLM(EngineClient):
         prompt_text: str | None = None,
     ) -> RequestOutputCollector:
         """Add new request to the AsyncLLM."""
-
+        """
+        把“用户态 prompt "变成一个“EngineCore 能执行的 request", 并在本进程建立完整的请求状态机
+        """
         if self.errored:
             raise EngineDeadError()
 
         is_pooling = isinstance(params, PoolingParams)
 
+        """
+        为这个 request 请求预留输出通道
+        后面所有的：
+        - token
+        - chunk
+        - finished
+        都会通过这个 collector → queue → yield。
+        """
         # Create a new output collector for the request.
         queue = RequestOutputCollector(output_kind=params.output_kind)
 
@@ -376,6 +386,13 @@ class AsyncLLM(EngineClient):
         priority: int = 0,
         data_parallel_rank: int | None = None,
     ) -> AsyncGenerator[RequestOutput, None]:
+
+        """
+        这个方法的本质：
+        注册请求 → 后台持续拉取 EngineCore 输出 → 
+        → 通过 asyncio Queue 把 token 流式吐给用户 → 结束或中断时清理请求
+        """
+
         """
         Main function called by the API server to kick off a request
             * 1) Making an AsyncStream corresponding to the Request.
@@ -402,13 +419,15 @@ class AsyncLLM(EngineClient):
             )
 
         try:
-            # 首次调用 generate() 时，启动 output_handler
-            # _run_output_handler 是 AsyncLLM 类中的一个私有实例方法，
-            # 负责创建并运行一个持续的后台 asyncio 任务（output_handler），
-            # 该任务从 EngineCore 拉取模型输出，经过处理后推送到每个请求对应的输出流中。
-            # We start the output_handler on the first call to generate() so
-            # we can call __init__ before the event loop, which enables us
-            # to handle startup failure gracefully in the OpenAI server.
+            # 1. 先保证输出能够被正确获取
+            """
+            首次调用 generate() 时，启动 output_handler
+            _run_output_handler 负责创建并运行一个持续的后台 asyncio 任务（output_handler），
+            该任务从 EngineCore 拉取模型输出，经过处理后推送到每个请求对应的输出流中。
+            We start the output_handler on the first call to generate() so
+            we can call __init__ before the event loop, which enables us
+            to handle startup failure gracefully in the OpenAI server.
+            """
             self._run_output_handler()
 
             # Wait until generation is resumed if the engine is paused.
@@ -429,6 +448,7 @@ class AsyncLLM(EngineClient):
                     tokenization_kwargs,
                 )
 
+            # 2. 把请求加入队列
             q = await self.add_request(
                 request_id,
                 prompt,
@@ -441,6 +461,7 @@ class AsyncLLM(EngineClient):
                 prompt_text=prompt_text,
             )
 
+            # 3. 循环拉取结果
             # The output_handler task pushes items into the queue.
             # This task pulls from the queue and yields to caller.
             finished = False
@@ -455,6 +476,7 @@ class AsyncLLM(EngineClient):
                 assert isinstance(out, RequestOutput)
                 yield out
 
+        # 4. 处理被结束 或者被 abort 的请求
         # If the request is disconnected by the client, generate()
         # is cancelled or the generator is garbage collected. So,
         # we abort the request if we end up here.

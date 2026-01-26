@@ -361,7 +361,7 @@ class OpenAIServingChat(OpenAIServing):
                     # 这边 engine_client 是协议类
                     # 具体的实现由 AsyncLLMEngine 提供
                     # 返回的 generator 是 AsyncGenerator[RequestOutput, None] 类型
-                    # 这个生成器会持续从队列中获取推理结果并yield出来
+                    # 注册请求 → 后台持续拉取 EngineCore 输出 → 通过 asyncio Queue 把 token 流式吐给用户 → 结束或中断时清理请求
                     generator = self.engine_client.generate(
                         engine_request,                    # 处理后的请求对象
                         sampling_params,                   # 采样参数（如 temperature、top_p）

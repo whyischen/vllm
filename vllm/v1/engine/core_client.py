@@ -437,6 +437,7 @@ class BackgroundResources:
 class MPClient(EngineCoreClient):
     """
     MPClient: base client for multi-proc EngineCore.
+        》EngineCore 在后台循环处理请求，返回结果
         EngineCore runs in a background process busy loop, getting
         new EngineCoreRequests and returning EngineCoreOutputs
 
@@ -481,6 +482,7 @@ class MPClient(EngineCoreClient):
                 output_address = client_addresses["output_address"]
                 self.stats_update_address = client_addresses.get("stats_update_address")
             else:
+                # 启动后台 EngineCore 进程（或连接外部已有 engine）
                 # Engines are managed by this client.
                 with launch_core_engines(vllm_config, executor_class, log_stats) as (
                     engine_manager,
@@ -498,6 +500,8 @@ class MPClient(EngineCoreClient):
                         coordinator.get_stats_publish_address()
                     )
 
+            # 初始化客户端变量
+            # 用户发送请求，接收结果
             # Create input and output sockets.
             self.input_socket = self.resources.input_socket = make_zmq_socket(
                 self.ctx, input_address, zmq.ROUTER, bind=True
