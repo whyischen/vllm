@@ -176,6 +176,7 @@ class OpenAIServingChat(OpenAIServing):
         for the API specification. This API mimics the OpenAI
         Chat Completion API.
         """
+        # 模型是否支持 chat
         error_check_ret = await self._check_model(request)
         if error_check_ret is not None:
             logger.error("Error with model %s", error_check_ret)
@@ -193,7 +194,7 @@ class OpenAIServingChat(OpenAIServing):
             )
 
             model_name = self.models.model_name(lora_request)
-
+            # 获取 tokenizer
             tokenizer = await self.engine_client.get_tokenizer()
 
             tool_parser = self.tool_parser
@@ -283,7 +284,7 @@ class OpenAIServingChat(OpenAIServing):
         # Extract data_parallel_rank from header (router can inject it)
         data_parallel_rank = self._get_data_parallel_rank(raw_request)
 
-        # 结果生成器，虽然声明的是 [], 但是会验证 len = 1，说明这个方法一次只会处理一次对话
+        # 虽然 结果生成器声明的是 列表  类型, 但是会验证 len = 1，说明这个方法一次只会处理一次对话
         # Schedule the request and get the result generator.
         generators: list[AsyncGenerator[RequestOutput, None]] = []
         try:

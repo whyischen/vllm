@@ -491,6 +491,7 @@ async def create_chat_completion(request: ChatCompletionRequest, raw_request: Re
     metrics_header_format = raw_request.headers.get(
         ENDPOINT_LOAD_METRICS_FORMAT_HEADER_LABEL, ""
     )
+    # OpenAIServingChat
     handler = chat(raw_request)
     # 错误校验
     if handler is None:
@@ -499,6 +500,11 @@ async def create_chat_completion(request: ChatCompletionRequest, raw_request: Re
         )
     try:
         # 创建对话请求
+        """ 
+        返回的 generator 可能是两个类型 
+        ChatCompletionResponse → JSONResponse
+        AsyncGenerator[str] → StreamingResponse(text/event-stream)
+        """
         generator = await handler.create_chat_completion(request, raw_request)
     except Exception as e:
         raise HTTPException(
