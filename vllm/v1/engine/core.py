@@ -105,6 +105,7 @@ class EngineCore:
 
         self.available_gpu_memory_for_kv_cache = -1
 
+        # TODO victor wang
         # Setup KV Caches and update CacheConfig after profiling.
         num_gpu_blocks, num_cpu_blocks, kv_cache_config = self._initialize_kv_caches(
             vllm_config
