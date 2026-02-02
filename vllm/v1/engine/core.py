@@ -85,9 +85,9 @@ class EngineCore:
     ):
         # plugins need to be loaded at the engine/scheduler level too
         from vllm.plugins import load_general_plugins
-
+        # 加载通用插件
         load_general_plugins()
-
+        # 保存配置
         self.vllm_config = vllm_config
         if vllm_config.parallel_config.data_parallel_rank == 0:
             logger.info(
@@ -97,7 +97,7 @@ class EngineCore:
             )
 
         self.log_stats = log_stats
-
+        # 初始化模型执行器
         # Setup Model.
         self.model_executor = executor_class(vllm_config)
         if executor_fail_callback is not None:
@@ -105,6 +105,7 @@ class EngineCore:
 
         self.available_gpu_memory_for_kv_cache = -1
 
+        # 初始化 KV 缓存（调用 _initialize_kv_caches）
         # Setup KV Caches and update CacheConfig after profiling.
         num_gpu_blocks, num_cpu_blocks, kv_cache_config = self._initialize_kv_caches(
             vllm_config
@@ -113,9 +114,9 @@ class EngineCore:
         vllm_config.cache_config.num_gpu_blocks = num_gpu_blocks
         vllm_config.cache_config.num_cpu_blocks = num_cpu_blocks
         self.collective_rpc("initialize_cache", args=(num_gpu_blocks, num_cpu_blocks))
-
+        # 初始化结构化输出管理器
         self.structured_output_manager = StructuredOutputManager(vllm_config)
-
+        # 初始化调度器
         # Setup scheduler.
         Scheduler = vllm_config.scheduler_config.get_scheduler_cls()
 
