@@ -880,11 +880,13 @@ class EngineCoreProc(EngineCore):
 
     def run_busy_loop(self):
         """Core busy loop of the EngineCore."""
-
+        # EngineCore 的核心循环
         # Loop until process is sent a SIGINT or SIGTERM
         while True:
-            # 1) Poll the input queue until there is work to do.
+            # 处理输入队列的新请求和中止请求
+            # 1) Poll the input queue until there is work to do. 轮询输入队列
             self._process_input_queue()
+            # 执行引擎步骤（调度 + 模型执行）
             # 2) Step the engine core and return the outputs.
             self._process_engine_step()
 

@@ -45,24 +45,24 @@ class Request:
         trace_headers: Mapping[str, str] | None = None,
         block_hasher: Callable[["Request"], list["BlockHash"]] | None = None,
     ) -> None:
-        self.request_id = request_id
-        self.client_index = client_index
-        self.priority = priority
-        self.sampling_params = sampling_params
-        self.pooling_params = pooling_params
+        self.request_id = request_id    # 请求 ID
+        self.client_index = client_index    # 客户端索引
+        self.priority = priority    # 优先级
+        self.sampling_params = sampling_params    # 采样参数
+        self.pooling_params = pooling_params    # 汇总参数
         # Because of LoRA, the eos token id can be different for each request.
-        self.eos_token_id = eos_token_id
+        self.eos_token_id = eos_token_id    # 结束 token id
         self.lora_request = lora_request
         self.structured_output_request = StructuredOutputRequest.from_sampling_params(
             sampling_params
         )
         self.arrival_time = arrival_time if arrival_time is not None else time.time()
+    
+        self.status = RequestStatus.WAITING    # 请求状态
+        self.events: list[EngineCoreEvent] = []    # 事件列表
+        self.stop_reason: int | str | None = None    # 停止原因
 
-        self.status = RequestStatus.WAITING
-        self.events: list[EngineCoreEvent] = []
-        self.stop_reason: int | str | None = None
-
-        # P/D: Connector-specific KV transfer parameters.
+        # P/D: Connector-specific KV_all_token_ids transfer parameters.
         self.kv_transfer_params: dict[str, Any] | None = None
 
         if pooling_params is not None:
@@ -82,12 +82,16 @@ class Request:
         else:
             raise ValueError("sampling_params and pooling_params can't both be unset")
 
-        self.prompt_token_ids = prompt_token_ids
+        # 内容相关
+
+        self.prompt_token_ids = prompt_token_ids    # 输入 token ids
         self.prompt_embeds = prompt_embeds
         self.num_prompt_tokens = length_from_prompt_token_ids_or_embeds(
             prompt_token_ids, prompt_embeds
         )
-        self._output_token_ids: list[int] = []
+        self._output_token_ids: list[int] = []    # 输出 token ids
+        # 条件表达式：(真结果, 判断条件, 假结果)
+        # 所有 token ID
         self._all_token_ids: list[int] = (
             self.prompt_token_ids.copy()
             if self.prompt_token_ids is not None
@@ -100,7 +104,7 @@ class Request:
         self.discard_latest_async_tokens = False
 
         self.spec_token_ids: list[int] = []
-        self.num_computed_tokens = 0
+        self.num_computed_tokens = 0    # 已计算的 token 个数
         self.cache_salt: str | None = cache_salt
 
         # Multi-modal related
@@ -117,7 +121,7 @@ class Request:
         self.trace_headers = trace_headers
         # State
         # The number of tokens with prefix cache hits.
-        self.num_cached_tokens = -1
+        self.num_cached_tokens = -1    # 缓存 token 数
 
         # The number of NaNs in logits. A value greater than 0
         # indicates that the output is corrupted
