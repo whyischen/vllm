@@ -30,7 +30,7 @@ from vllm.v1.core.encoder_cache_manager import (
     EncoderDecoderCacheManager,
     compute_encoder_budget,
 )
-from vllm.v1.core.kv_cache_manager import KVCacheBlocks, KVCacheManager
+from vllm.v1.core.kv_cache_manager import KVCacheBScheduler locks, KVCacheManager
 from vllm.v1.core.kv_cache_metrics import KVCacheMetricsCollector
 from vllm.v1.core.sched.interface import SchedulerInterface
 from vllm.v1.core.sched.output import (
@@ -214,6 +214,7 @@ class Scheduler(SchedulerInterface):
         self.use_v2_model_runner = envs.VLLM_USE_V2_MODEL_RUNNER
 
     def schedule(self) -> SchedulerOutput:
+        # 调度算法的核心思想
         # NOTE(woosuk) on the scheduling algorithm:
         # There's no "decoding phase" nor "prefill phase" in the scheduler.
         # Each request just has the num_computed_tokens and
@@ -226,8 +227,8 @@ class Scheduler(SchedulerInterface):
         # and the "jump decoding" optimization in the future.
 
         scheduled_new_reqs: list[Request] = []
-        scheduled_resumed_reqs: list[Request] = []
-        scheduled_running_reqs: list[Request] = []
+        scheduled_resumed_reqs: list[Request] = []  # 恢复的请求，目前暂未实现
+        scheduled_running_reqs: list[Request] = []  # 
         preempted_reqs: list[Request] = []
 
         req_to_new_blocks: dict[str, KVCacheBlocks] = {}
@@ -242,12 +243,13 @@ class Scheduler(SchedulerInterface):
         # For logging.
         scheduled_timestamp = time.monotonic()
 
+        # 1. 先调度运行中的请求
         # First, schedule the RUNNING requests.
         req_index = 0
         while req_index < len(self.running) and token_budget > 0:
             request = self.running[req_index]
 
-            if (
+            if (      
                 request.num_output_placeholders > 0
                 # This is (num_computed_tokens + 1) - (num_output_placeholders - 1).
                 # Since output placeholders are also included in the computed tokens
@@ -422,6 +424,7 @@ class Scheduler(SchedulerInterface):
         # skipped and put back at the head of the waiting queue later
         skipped_waiting_requests = create_request_queue(self.policy)
 
+        # 2. 再调度等待中的请求
         # Next, schedule the WAITING requests.
         if not preempted_reqs:
             while self.waiting and token_budget > 0:
@@ -685,6 +688,7 @@ class Scheduler(SchedulerInterface):
                     )
                 )
 
+        # 3. 构造输出
         # Construct the scheduler output.
         if self.use_v2_model_runner:
             scheduled_new_reqs = scheduled_new_reqs + scheduled_resumed_reqs
